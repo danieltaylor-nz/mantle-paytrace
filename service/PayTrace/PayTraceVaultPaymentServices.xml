@@ -75,13 +75,6 @@
 
             <set field="paymentOperationEnumId" value="PgoAuthorize"/>
             <service-call name="PayTrace.PayTraceVaultPaymentServices.save#Response" in-map="context" out-map="context"/>
-
-            <!-- NOTE: only send for larger amounts? -->
-            <if condition="payment.orderId &amp;&amp; creditCard.creditCardTypeEnumId in ['CctVisa', 'CctMastercard']">
-                <!-- NOTE: called async for performance reasons, secondary priority to auth, and to keep errors from causing problems with the auth -->
-                <service-call name="PayTrace.PayTraceVaultPaymentServices.send#LevelThreeData" async="true"
-                        in-map="[paymentId:paymentId, paymentGatewayConfigId:paymentGatewayConfigId, accessToken:accessToken]"/>
-            </if>
         </actions>
     </service>
     <service verb="send" noun="LevelThreeData" authenticate="anonymous-all">
@@ -92,7 +85,7 @@
             <parameter name="accessToken"/>
         </in-parameters>
         <out-parameters>
-            <!-- <parameter name="requestMap" type="Map"/><parameter name="responseMap" type="Map"/> -->
+            <parameter name="requestMap" type="Map"/><parameter name="responseMap" type="Map"/>
         </out-parameters>
         <actions>
             <entity-find-one entity-name="PayTrace.PaymentGatewayPayTrace" value-field="pgpt"/>
@@ -422,10 +415,11 @@
             <if condition="pgpt == null"><return error="true" message="No PaymentGatewayPayTrace found with ID ${paymentGatewayConfigId}"/></if>
 
             <service-call name="PayTrace.PayTraceVaultPaymentServices.login#PayTrace" in-map="context" out-map="token"/>
+            <set field="accessToken" from="token.token.access_token"/>
                 
             <script><![CDATA[
                 org.moqui.util.RestClient restClient = ec.service.rest().method(org.moqui.util.RestClient.POST)
-                        .addHeader("Authorization", "Bearer ${token.token.access_token}")
+                        .addHeader("Authorization", "Bearer ${accessToken}")
                         .addHeader("Content-Type", "application/json").jsonObject(requestMap)
                 restClient.uri().protocol("https").host(pgpt.hostName ?: "api.paytrace.com").port(443).path(pgpt.apiVersion ?: "v1")
                         .path("transactions").path("authorization").path("capture").build()
@@ -441,6 +435,13 @@
 
             <set field="paymentOperationEnumId" value="PgoCapture"/>
             <service-call name="PayTrace.PayTraceVaultPaymentServices.save#Response" in-map="context" out-map="context"/>
+
+            <!-- NOTE: only send for larger amounts? -->
+            <if condition="payment.orderId &amp;&amp; creditCard.creditCardTypeEnumId in ['CctVisa', 'CctMastercard']">
+                <!-- NOTE: called async for performance reasons, secondary priority to auth, and to keep errors from causing problems with the auth -->
+                <service-call name="PayTrace.PayTraceVaultPaymentServices.send#LevelThreeData" async="true"
+                        in-map="[paymentId:paymentId, paymentGatewayConfigId:paymentGatewayConfigId, accessToken:accessToken]"/>
+            </if>
         </actions>
     </service>
     <service verb="authorizeAndCapture" noun="Payment">
@@ -477,6 +478,7 @@
             <if condition="pgpt == null"><return error="true" message="No PaymentGatewayPayTrace found with ID ${paymentGatewayConfigId}"/></if>
 
             <service-call name="PayTrace.PayTraceVaultPaymentServices.login#PayTrace" in-map="context" out-map="token"/>
+            <set field="accessToken" from="token.token.access_token"/>
 
             <!-- assemble the full request Map -->
             <set field="requestMap" from="[amount:payment.amount, customer_id:paymentMethod.gatewayCimId, integrator_id:pgpt.integratorId, invoice_id:payment.orderId]"/>
@@ -485,7 +487,7 @@
 
             <script><![CDATA[
                 org.moqui.util.RestClient restClient = ec.service.rest().method(org.moqui.util.RestClient.POST)
-                        .addHeader("Authorization", "Bearer ${token.token.access_token}")
+                        .addHeader("Authorization", "Bearer ${accessToken}")
                         .addHeader("Content-Type", "application/json").jsonObject(requestMap)
                 restClient.uri().protocol("https").host(pgpt.hostName ?: "api.paytrace.com").port(443).path(pgpt.apiVersion ?: "v1")
                         .path("transactions").path("sale").path("by_customer").build()
@@ -501,6 +503,13 @@
 
             <set field="paymentOperationEnumId" value="PgoAuthAndCapture"/>
             <service-call name="PayTrace.PayTraceVaultPaymentServices.save#Response" in-map="context" out-map="context"/>
+
+            <!-- NOTE: only send for larger amounts? -->
+            <if condition="payment.orderId &amp;&amp; creditCard.creditCardTypeEnumId in ['CctVisa', 'CctMastercard']">
+                <!-- NOTE: called async for performance reasons, secondary priority to auth, and to keep errors from causing problems with the auth -->
+                <service-call name="PayTrace.PayTraceVaultPaymentServices.send#LevelThreeData" async="true"
+                        in-map="[paymentId:paymentId, paymentGatewayConfigId:paymentGatewayConfigId, accessToken:accessToken]"/>
+            </if>
         </actions>
     </service>
     <service verb="refund" noun="Payment">
